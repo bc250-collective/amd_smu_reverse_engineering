@@ -8,7 +8,7 @@ AMD SMU Reverse Engineering (for AMD BC-250)
 The System Management Unit (SMU) is a tiny microcontroller on the CPU die that handles power, voltage, frequency, and thermal management.
 It enforces boost behavior, current/power limits, and dynamic voltage/frequency scaling.
 
-### Why Tools Like ZenStates-Core ryzen_smu or Need It
+### Why Tools Like ZenStates-Core or ryzen_smu Need It
 
 ZenStates-Core or ryzen_smu talks directly to the SMU via low-level commands to change voltages, frequencies, and power limits in real time.
 This allows fine-grained tuning (like undervolting or overclocking) that BIOS or standard software can’t fully control.
