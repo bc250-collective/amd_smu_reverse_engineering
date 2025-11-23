@@ -14,9 +14,9 @@ ZenStates-Core or ryzen_smu talks directly to the SMU via low-level commands to 
 This allows fine-grained tuning (like undervolting or overclocking) that BIOS or standard software can’t fully control.
 SMU access is required because the OS alone cannot safely modify these internal settings.
 
-Boards like the AMD BC-250 also have a SMU. Only the interface with the graphics core are documented in the amdgpu code. Currently there is no way to do power mangement or overclocking on the cpu. Therefore we reverse engineer the SMU firmware to try to gain access to these functions.
+Boards like the AMD BC-250 also have a SMU. Only the interface with the graphics core are documented in the amdgpu code. Currently there is no way to do power mangement or overclocking on the cpu. Therefore we reverse engineer the SMU firmware to try to gain access to these functions. 
 
-The SMU works by sending messages with ids and parameters to get information back or change the smu state thereby controlling the system.
+The SMU works by sending messages with ids and parameters to get information back or change the smu state thereby controlling the system. The main goal of this repo is to get a list of these messages and understand their function by means of inspecting the firmware. 
 
 (This was only extensively tested on BC-250 firmware but should with most Xtensa based AMD SMU firmware which is everything since Zen + GPUs since ???)
 
@@ -82,10 +82,13 @@ Then, in /opt/ghidra/ run this:
 
 ## Example with AMD BC-250: 
 
-I have included bc250_smu_3_trim. This is the smu firmware image from BIOS 3.0 of the AMD BC-250. If you extract the data from the bios you will notice that there is only 1 firmware that has significant data in it (indicating that the BC-250 only has one SMU for both gpu and cpu?)
+I have included bc250_smu_3_trim. 
+This is the smu firmware image from BIOS 3.0 of the AMD BC-250. If you extract the data from the bios you will notice that there is only 1 firmware that has significant data in it (indicating that the BC-250 only has one SMU for both gpu and cpu?)
+
 I you get to step 3 you will get an output like this:
 (notice that i have already added the matching function names from linux/drivers/gpu/drm/amd/pm/swsmu/inc/pmfw_if/smu_v11_8_ppsmc.h, on your dissasembly they will have generic FUN... names)
 
+<pre>
 table entry func addr.  symbol
 0x00007070  0x0001B3A8  PPSMC_MSG_TestMessage
 0x00007078  0x0001B3C0  PPSMC_MSG_GetSmuVersion
@@ -93,6 +96,7 @@ table entry func addr.  symbol
 0x00007088  0x0001B998  PPSMC_MSG_SetDriverTableDramAddrHigh
 0x00007090  0x0001B9B4  PPSMC_MSG_SetDriverTableDramAddrLow
 ....
+</pre>
 
 This output will not contain messages that do not have a defined handler function (i.e. the func addr. is 0000_0000), to get this we need to parse the queue table
 locate it according to step 4)
