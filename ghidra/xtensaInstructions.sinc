@@ -584,16 +584,135 @@ macro extract_bit(bit, result) {
   fr = float2float(const_sf_imm);
 }
 
-# Stub out some insns which mainly appear in boilerplate library functions...
-:div0.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b0111 & op0=0 unimpl
-:sqrt0.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1001 & op0=0 unimpl
-:nexp01.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1011 & op0=0 unimpl
-:mksadj.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1100 & op0=0 unimpl
-:mkdadj.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1101 & op0=0 unimpl
-:addexp.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1110 & op0=0 unimpl
-:addexpm.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1111 & op0=0 unimpl
-:maddn.sf fr, fs, ft is op2=0b0110 & op1=0b1010 & fr & fs & ft & op0=0 unimpl
-:divn.sf fr, fs, ft is op2=0b0111 & op1=0b1010 & fr & fs & ft & op0=0 unimpl
+# DIV0.S — start divide sequence, approximate reciprocal
+:div0.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b0111 & op0=0
+{
+    # Model as "some function of fs" – here, just copy.
+    # If you later have float helper ops, you can change this to
+    fr = 0x3f800000 f/ fs; # Basically 1.0 / fs
+}
+
+# SQRT0.S — start sqrt sequence, approximate reciprocal sqrt
+:sqrt0.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1001 & op0=0
+{
+    # Likewise, we just pass the arg through to give a sensible data-flow.
+    # With a float helper available you could model ~1/sqrt(fs) instead.
+    fr = 0x3f800000 f/ sqrt(fs); # Basically 1.0 / sqrt(fs)
+}
+
+# NEXP01.S — Narrow Exponent Range Single (scalar FP)
+# For normal finite numbers (0 < e < 255):
+#   - Flip sign bit
+#   - Let E = e - 127 (unbiased exponent)
+#   - Let Ey = E mod 2 (0 or 1)
+#   - New exponent = Ey + 127
+# For zero / denormals / NaN / Inf (e == 0 or e == 255):
+#   - Just flip sign bit, keep exponent & fraction
+:nexp01.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1011 & op0=0
+{
+    # Decompose IEEE754 single
+    local s = fs >> 31;              # sign bit (0/1)
+    local e = (fs >> 23) & 0xff;     # exponent (8 bits)
+    local f = fs & 0x7fffff;         # fraction (23 bits)
+
+    # Flip sign bit unconditionally
+    local news = s ^ 1;
+
+    # Compute narrowed exponent candidate for "normal" case
+    local E  = e - 0x7f;             # unbiased exponent
+    local N  = E >> 1;               # floor(E / 2)
+    local Ey = E - (N << 1);         # Ey = E mod 2 (0 or 1)
+    local narrowed = (Ey + 0x7f) & 0xff;
+
+    # Build a mask to decide whether to use 'narrowed' or original 'e'
+    # eq_zero = 1 if e == 0
+    local eq_zero = (e == 0);
+    # eq_ff = 1 if e == 255
+    local eq_ff   = (e == 0xff);
+    # either = 1 if e is 0 or 255 (special case), else 0
+    local either  = eq_zero | eq_ff;
+    # normal = 1 if e is *not* 0 or 255, else 0
+    local normal  = (either == 0);
+
+    # Extend 1-bit flags to 8-bit masks
+    local norm8    = zext(normal);   # 0x00 or 0x01
+    local notnorm8 = zext(either);   # 0x00 or 0x01
+
+    # Select exponent: normal → narrowed, special → original e
+    local newe = (norm8 & narrowed) | (notnorm8 & e);
+
+    # Reassemble float
+    fr = (news << 31) | (newe << 23) | f;
+}
+
+# MKSADJ.S – make sqrt adjustment.
+# Real hardware tucks an exponent adjustment into the operand; here we just propagate fs so the dataflow is visible.
+:mksadj.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1100 & op0=0 {
+    fr = fs;
+}
+
+# MKDADJ.S – make divide adjustment.
+# Approximate by splicing sign+exp from fs with mantissa from the current fr.
+:mkdadj.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1101 & op0=0 {
+    local a:4 = fr;
+    local b:4 = fs;
+    local newval:4 = (b & 0xff800000) | (a & 0x007fffff);
+    fr = newval;
+}
+
+# ADDEXP.S – add unbiased exponents and XOR signs (mantissa unchanged).
+:addexp.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1110 & op0=0 {
+
+    local r:4 = fr;
+    local s:4 = fs;
+
+    local sign_r:4 = (r >> 31) & 1;
+    local sign_s:4 = (s >> 31) & 1;
+    local exp_r:4  = (r >> 23) & 0xff;
+    local exp_s:4  = (s >> 23) & 0xff;
+    local frac:4   = r & 0x7fffff;
+
+    sign_r = sign_r ^ sign_s;
+    exp_r  = exp_r + exp_s - 127;
+
+    r  = (sign_r << 31) | ((exp_r & 0xff) << 23) | frac;
+    fr = r;
+}
+
+# ADDEXPM.S – like ADDEXP.S but exponent/sign contribution comes from
+# mantissa bits of fs (see ISA description).
+:addexpm.sf fr, fs is op2=0b1111 & op1=0b1010 & fr & fs & at=0b1111 & op0=0 {
+
+    local r:4 = fr;
+    local s:4 = fs;
+
+    local sign_r:4 = (r >> 31) & 1;
+    local exp_r:4  = (r >> 23) & 0xff;
+    local frac:4   = r & 0x7fffff;
+
+    local bit_sign:4 = (s >> 22) & 1;       # FR[s]22
+    local bits_exp:4 = (s >> 14) & 0xff;    # FR[s]21..14
+
+    sign_r = sign_r ^ bit_sign;
+    exp_r  = exp_r + bits_exp - 127;
+
+    r  = (sign_r << 31) | ((exp_r & 0xff) << 23) | frac;
+    fr = r;
+}
+
+
+
+# MADDN.S – Newton-step multiply-add (no extra rounding).
+:maddn.sf fr, fs, ft is op2=0b0110 & op1=0b1010 & fr & fs & ft & op0=0 {
+    # Model as integer multiply-add on raw bits.
+    fr = fr f+ (fs f* ft);
+}
+
+# DIVN.S – final multiply-add in divide / sqrt sequences.
+:divn.sf fr, fs, ft is op2=0b0111 & op1=0b1010 & fr & fs & ft & op0=0 {
+    # Same dataflow as MADD.S; special exponent handling is ignored here.
+    fr = fr f+ (fs f* ft);
+}
 
 
 # J.L is a macro.
