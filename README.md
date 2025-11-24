@@ -28,7 +28,7 @@ The SMU works by sending messages with ids and parameters to get information bac
 4) SMU firmware images are located in SMU_OFFCHIP_FW_x-entries usually there are 2 (cpu + gpu maybe)
 5) Then extract them using <pre> psptool -X -d 0 -e 1 -o firmware.bin bios.bin </pre> (replace directories and entry with your specific entries)
 6) You now have the firmware image 
-7) To analyze it in ghidra, remove the header with size 0x100: <pre> dd bs=256 skip=1 if=firmware.bin of=firmware_trin.bin </pre> (this is important)
+7) To analyze it in ghidra, remove the header with size 0x100: <pre> dd bs=256 skip=1 if=firmware.bin of=firmware_trim.bin </pre> (this is important)
 
 ## To install the script "smu_message_helper.py": 
 1) Launch ghidra from <pre> /support/pyghidraRun </pre> (make sure pyghidra is working)
