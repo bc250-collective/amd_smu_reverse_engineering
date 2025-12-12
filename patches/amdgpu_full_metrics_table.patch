@@ -1,12 +1,14 @@
 diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c
-index 9548bd3c6..1b06d9cb4 100644
+index 9548bd3c6..a3d472099 100644
 --- a/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c
 +++ b/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c
-@@ -46,7 +46,7 @@
+@@ -45,8 +45,8 @@
+ #undef pr_debug
  
  /* unit: MHz */
- #define CYAN_SKILLFISH_SCLK_MIN			1000
+-#define CYAN_SKILLFISH_SCLK_MIN			1000
 -#define CYAN_SKILLFISH_SCLK_MAX			2000
++#define CYAN_SKILLFISH_SCLK_MIN			500
 +#define CYAN_SKILLFISH_SCLK_MAX			2230
  
  /* unit: mV */
