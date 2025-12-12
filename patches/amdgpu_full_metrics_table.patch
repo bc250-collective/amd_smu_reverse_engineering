@@ -1,0 +1,89 @@
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c
+index 9548bd3c6..1b06d9cb4 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu11/cyan_skillfish_ppt.c
+@@ -46,7 +46,7 @@
+ 
+ /* unit: MHz */
+ #define CYAN_SKILLFISH_SCLK_MIN			1000
+-#define CYAN_SKILLFISH_SCLK_MAX			2000
++#define CYAN_SKILLFISH_SCLK_MAX			2230
+ 
+ /* unit: mV */
+ #define CYAN_SKILLFISH_VDDC_MIN			700
+@@ -287,6 +287,62 @@ static int cyan_skillfish_get_current_clk_freq(struct smu_context *smu,
+ 	return cyan_skillfish_get_smu_metrics_data(smu, member_type, value);
+ }
+ 
++static void cyan_skillfish_print_smu_table(struct smu_context *smu, char *buf, int *size_ptr)
++{
++	struct smu_table_context *smu_table = &smu->smu_table;
++	SmuMetrics_t *metrics = (SmuMetrics_t *)smu_table->metrics_table;
++	int ret = 0;
++
++	int size = *size_ptr;
++
++	ret = smu_cmn_get_metrics_table(smu, NULL, false);
++	if (ret) {
++		printk(KERN_WARNING "cyan_skillfish_print_smu_table: failed to get SMU Metrics table");
++		return;
++	}
++
++		int i = 0;
++	// print cpu info
++	size += sysfs_emit_at(buf, size, "\ncore n: clk     power temp  C0%% \n");
++	for(i = 0; i < 6; i++) {
++		size += sysfs_emit_at(buf, size, "core %d: %dMHz   %dW  %d°C  %d \n", i+1 , metrics->Current.CoreFrequency[i], metrics->Current.CorePower[i] / 1000, metrics->Current.CoreTemperature[i] / 100, metrics->Current.C0Residency[i]);
++	}
++
++	//cache info
++	size += sysfs_emit_at(buf, size, "\n");
++	for(i = 0; i < 2; i++) {
++		size += sysfs_emit_at(buf, size, "L3 #%d:  %dMHz       %d°C \n", i+1, metrics->Current.L3Frequency[i], metrics->Current.L3Temperature[i] / 100);
++	}
++
++	//gfx info
++	size += sysfs_emit_at(buf, size, "\n");
++	size += sysfs_emit_at(buf, size, "gfx:    %dMHz       %d°C \n", metrics->Current.GfxclkFrequency, metrics->Current.GfxTemperature / 100);
++
++	//other data
++	size += sysfs_emit_at(buf, size, "\n");
++	size += sysfs_emit_at(buf, size, "soc:    %dMHz       %d°C \n", metrics->Current.SocclkFrequency, metrics->Current.SocTemperature / 100);
++	size += sysfs_emit_at(buf, size, "vclk:   %dMHz \n", metrics->Current.VclkFrequency);
++	size += sysfs_emit_at(buf, size, "dclk:   %dMHz \n", metrics->Current.DclkFrequency);
++	size += sysfs_emit_at(buf, size, "mem:    %dMHz \n", metrics->Current.MemclkFrequency);
++	size += sysfs_emit_at(buf, size, "edge:                 %d°C\n", metrics->Current.EdgeTemperature / 100);
++
++	//power
++	size += sysfs_emit_at(buf, size, "\n");
++	for(i = 0; i < 2; i++) {
++		size += sysfs_emit_at(buf, size, "pd %s: %dmV  %dA  %dW \n", i == 0 ? "cpu" : "gpu", metrics->Current.Voltage[i], metrics->Current.Current[i] / 1000 , metrics->Current.Power[i] / 1000);
++	}
++	size += sysfs_emit_at(buf, size, "pd socket: %dW \n", metrics->Current.CurrentSocketPower / 1000);
++
++	//throttle
++	size += sysfs_emit_at(buf, size, "\nthrottle: %d \n", metrics->Current.ThrottlerStatus);
++
++	size += sysfs_emit_at(buf, size, "\n");
++
++	*size_ptr = size;
++
++	return;
++}
++
+ static int cyan_skillfish_print_clk_levels(struct smu_context *smu,
+ 					enum smu_clk_type clk_type,
+ 					char *buf)
+@@ -319,9 +375,11 @@ static int cyan_skillfish_print_clk_levels(struct smu_context *smu,
+ 		size += sysfs_emit_at(buf, size, "VDDC: %7umV  %10umV\n",
+ 						CYAN_SKILLFISH_VDDC_MIN, CYAN_SKILLFISH_VDDC_MAX);
+ 		break;
++	case SMU_SOCCLK:
++		cyan_skillfish_print_smu_table(smu, buf, &size);
++		break;
+ 	case SMU_FCLK:
+ 	case SMU_MCLK:
+-	case SMU_SOCCLK:
+ 	case SMU_VCLK:
+ 	case SMU_DCLK:
+ 		ret = cyan_skillfish_get_current_clk_freq(smu, clk_type, &cur_value);
