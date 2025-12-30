@@ -140,6 +140,23 @@ Periodic timer
   -> optional table transfer for telemetry
 ```
 
+## 11. Mermaid overview diagram
+
+```mermaid
+flowchart TD
+  Boot["Boot: smu_fw_entry_jump / smu_xtensa_start"] --> Init["_entry + init_system_2nd_level"]
+  Init --> Scheduler["Scheduler + task system"]
+  Scheduler --> Dispatch["dispatch_loop"]
+  Dispatch --> QueueDispatch["queue_dispatch"]
+  QueueDispatch -->|sync| Handler["Message handler"]
+  QueueDispatch -->|async| Enqueue["enqueue_handler"]
+  Enqueue --> Dispatch
+  Handler --> Response["Write RSP/ARG status"]
+
+  Init --> Timer["HW timer -> smu_features_enqueue_iteration"]
+  Timer --> Ticks["smu_run_tick_handlers"]
+```
+
 ## Glossary (quick)
 
 - Queue: A command channel with CMD/ARG/RSP registers.
