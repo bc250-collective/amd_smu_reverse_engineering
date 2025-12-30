@@ -1,6 +1,8 @@
 # amd_smu_reverse_engineering
 AMD SMU Reverse Engineering (for AMD BC-250)
 
+Read this document [SMU FIRMWARE](./SMU_FIRMWARE_OVERVIEW.md) if you are interested in internal details of SMU firmware.
+
 ## Background
 
 ### SMU on Ryzen CPUs
