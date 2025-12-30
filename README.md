@@ -143,4 +143,8 @@ It basically returns the parameter + 1 which is intended behaviour (see https://
 
 
 # Acknowledgements:
+- Rudolf Marek and his incredible work on lm32 version of SMU reverse engineering
+- NSA for creating and open-sourcing ghidra
 - @shuffle2 and @yath for work on https://github.com/yath/ghidra-xtensa/
+- contributors of https://www.psdevwiki.com/
+- contributors of @PSPReverse project for the PSPTool
